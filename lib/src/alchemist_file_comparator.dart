@@ -22,7 +22,7 @@ class AlchemistFileComparator extends GoldenFileComparator
     required this.basedir,
     required this.tolerance,
     p.Style? pathStyle,
-  }) : path = p.Context(style: pathStyle ?? p.Style.platform);
+  }) : path = p.Context(style: pathStyle ?? p.Style.platform), goldenFilePaths = _goldenFilePaths;
 
   /// Builds a [AlchemistFileComparator] based on a [LocalFileComparator].
   ///
@@ -63,6 +63,9 @@ class AlchemistFileComparator extends GoldenFileComparator
   @visibleForTesting
   final p.Context path;
 
+  /// Test
+  final List<String> goldenFilePaths;
+
   File _getGoldenFile(Uri golden) {
     return File(path.join(path.fromUri(basedir), path.fromUri(golden.path)));
   }
@@ -94,6 +97,29 @@ Use the tolerance property on the $PlatformGoldensConfig and $CiGoldensConfig cl
     final goldenFile = _getGoldenFile(golden);
     await goldenFile.parent.create(recursive: true);
     await goldenFile.writeAsBytes(imageBytes, flush: true);
+  }
+
+  static List<String> get _goldenFilePaths {
+    late Uri basedir;
+    if (goldenFileComparator is LocalFileComparator) {
+      basedir = (goldenFileComparator as LocalFileComparator).basedir;
+    } else {
+      basedir = (goldenFileComparator as AlchemistFileComparator).basedir;
+    }
+
+    return Directory.fromUri(basedir)
+        .listSync(recursive: true, followLinks: true)
+        .whereType<File>()
+        .map((file) => file.path)
+        .where((path) => path.endsWith('.png'))
+        .toList();
+  }
+
+  @override
+  Uri getTestUri(Uri key, int? version) {
+    final keyString = key.toFilePath();
+    return Uri.parse(goldenFilePaths
+        .singleWhere((goldenFilePath) => goldenFilePath.endsWith(keyString)));
   }
 
   /// Returns the bytes of the given [golden] file.
